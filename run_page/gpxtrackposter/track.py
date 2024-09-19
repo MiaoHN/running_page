@@ -13,6 +13,7 @@ import gpxpy as mod_gpxpy
 import lxml
 import polyline
 import s2sphere as s2
+import xml.etree.ElementTree as ET
 from garmin_fit_sdk import Decoder, Stream
 from garmin_fit_sdk.util import FIT_EPOCH_S
 from polyline_processor import filter_out
@@ -34,6 +35,22 @@ IGNORE_BEFORE_SAVING = os.getenv("IGNORE_BEFORE_SAVING", False)
 # So dividing latitude and longitude (int32) value by 11930465 will give the decimal value.
 SEMICIRCLE = 11930465
 
+
+def try_get_avg_bpm(filename):
+    # 解析 XML 文件
+    # 定义命名空间
+    tree = ET.parse(filename)
+    root = tree.getroot()
+    ns = {'tcx': 'http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2'}
+
+    # 检查 creator 属性
+    if root.attrib.get('creator') == 'Mi Fitness':
+        # 遍历 <Lap> 元素
+        for lap in root.findall('.//tcx:Lap', ns):
+            heart_rate_bpm = lap.find('tcx:HeartRateBpm', ns)
+            if heart_rate_bpm is not None:
+                return int(heart_rate_bpm.text)
+        return None
 
 class Track:
     def __init__(self):
@@ -81,6 +98,8 @@ class Track:
             if os.path.getsize(file_name) == 0:
                 raise TrackLoadError("Empty TCX file")
             self._load_tcx_data(tcx.read(file_name), file_name=file_name)
+            if self.average_heartrate is None:
+                self.average_heartrate = try_get_avg_bpm(file_name)
         except Exception as e:
             print(
                 f"Something went wrong when loading TCX. for file {self.file_names[0]}, we just ignore this file and continue"
@@ -156,9 +175,10 @@ class Track:
             self.polylines.append(line)
             polyline_container.extend([[p[0], p[1]] for p in position_values])
             self.polyline_container = polyline_container
-            self.start_time_local, self.end_time_local = parse_datetime_to_local(
-                self.start_time, self.end_time, polyline_container[0]
-            )
+            self.start_time_local, self.end_time_local = self.start_time, self.end_time
+            # self.start_time_local, self.end_time_local = parse_datetime_to_local(
+            #     self.start_time, self.end_time, polyline_container[0]
+            # )
             # get start point
             try:
                 self.start_latlng = start_point(*polyline_container[0])
@@ -329,6 +349,7 @@ class Track:
         }
 
     def to_namedtuple(self, run_from="gpx"):
+        print(self.start_time_local)
         d = {
             "id": self.run_id,
             "name": (
