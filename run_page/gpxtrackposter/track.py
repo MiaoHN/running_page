@@ -41,16 +41,17 @@ def try_get_avg_bpm(filename):
     # 定义命名空间
     tree = ET.parse(filename)
     root = tree.getroot()
-    ns = {'tcx': 'http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2'}
+    ns = {"tcx": "http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2"}
 
     # 检查 creator 属性
-    if root.attrib.get('creator') == 'Mi Fitness':
+    if root.attrib.get("creator") == "Mi Fitness":
         # 遍历 <Lap> 元素
-        for lap in root.findall('.//tcx:Lap', ns):
-            heart_rate_bpm = lap.find('tcx:HeartRateBpm', ns)
+        for lap in root.findall(".//tcx:Lap", ns):
+            heart_rate_bpm = lap.find("tcx:HeartRateBpm", ns)
             if heart_rate_bpm is not None:
                 return int(heart_rate_bpm.text)
         return None
+
 
 class Track:
     def __init__(self):
